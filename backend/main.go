@@ -2,11 +2,14 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 
+	"github.com/gorilla/websocket"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/skip2/go-qrcode"
 	"go.mau.fi/whatsmeow"
@@ -17,40 +20,102 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// Global variable to hold the client
-var client *whatsmeow.Client
+var (
+	client   *whatsmeow.Client
+	upgrader = websocket.Upgrader{
+		CheckOrigin: func(r *http.Request) bool {
+			return true
+		},
+	}
+	connections []*websocket.Conn
+)
 
 func eventHandler(evt interface{}) {
 	switch v := evt.(type) {
 	case *events.Message:
-		/*
-				"Received a message!" -> v.Message.GetConversation()
-			    "Username of the sender" -> v.Info.PushName)
-				"Is the message from a group chat ?" -> v.Info.IsGroup
-		*/
-
 		fmt.Println("Received a message from", v.Info.PushName, ":", v.Message.GetConversation())
 
 		reply := &waE2E.Message{
-			//Conversation: proto.String("Hey " + v.Info.PushName + ", sorry i'm not available right now 😅. You can leave a message and I will get back to you as soon as possible. ❤️"),
 			Conversation: proto.String(".❤️."),
 		}
 
-		// Send a reply only if the message is from Sofia Duarte Almeida (change the name to the one you want)
-		if v.Info.PushName == "Sofia Duarte Almeida" {
-			_, err := client.SendMessage(context.Background(), v.Info.Chat, reply)
-
-			if err != nil {
-				fmt.Println("Failed to send message:", err)
-			} else {
-
-				fmt.Println("Response message sent successfully.")
+		if v.Info.PushName == "arben" {
+			params := &whatsmeow.GetProfilePictureParams{
+				Preview:     true,
+				ExistingID:  v.Info.ID,
+				IsCommunity: false,
 			}
+			pic, err := client.GetProfilePictureInfo(v.Info.Sender, params)
+			if err != nil {
+				fmt.Println("Failed to get profile picture:", err)
+			}
+
+			msg := map[string]interface{}{
+				"message": v.Message.GetConversation(),
+				"sender":  v.Info,
+				"pic":     pic.URL,
+			}
+
+			// Send the message to all connected WebSocket clients
+			for _, conn := range connections {
+				msgBytes, err := json.Marshal(msg)
+				if err != nil {
+					fmt.Println("Failed to marshal message:", err)
+					return
+				}
+				err = conn.WriteMessage(websocket.TextMessage, msgBytes)
+				if err != nil {
+					fmt.Println("Failed to send message via WebSocket:", err)
+				}
+				if err != nil {
+					fmt.Println("Failed to send message via WebSocket:", err)
+				}
+			}
+
+			print("Message from Sofia Duarte Almeida: ", reply)
 		}
 	}
 }
 
+func wsHandler(w http.ResponseWriter, r *http.Request) {
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		fmt.Println("Failed to upgrade to WebSocket:", err)
+		return
+	}
+	fmt.Println("WebSocket connection established")
+	connections = append(connections, conn)
+
+	go func() {
+		defer func() {
+			conn.Close()
+			// Remove the connection from the list
+			for i, c := range connections {
+				if c == conn {
+					connections = append(connections[:i], connections[i+1:]...)
+					break
+				}
+			}
+		}()
+		for {
+			_, _, err := conn.ReadMessage()
+			if err != nil {
+				fmt.Println("WebSocket read error:", err)
+				return
+			}
+		}
+	}()
+}
+
 func main() {
+	http.HandleFunc("/ws", wsHandler)
+	go func() {
+		fmt.Println("Starting WebSocket server on :3000")
+		if err := http.ListenAndServe(":3000", nil); err != nil {
+			fmt.Println("WebSocket server failed:", err)
+		}
+	}()
+
 	dbLog := waLog.Stdout("Database", "DEBUG", true)
 	container, err := sqlstore.New("sqlite3", "file:usersdb.db?_foreign_keys=on", dbLog)
 	if err != nil {
@@ -67,7 +132,6 @@ func main() {
 	client.AddEventHandler(eventHandler)
 
 	if client.Store.ID == nil {
-		// No ID stored, new login
 		qrChan, _ := client.GetQRChannel(context.Background())
 
 		go func() {
@@ -91,14 +155,12 @@ func main() {
 			panic(err)
 		}
 	} else {
-		// Already logged in, just connect
 		err = client.Connect()
 		if err != nil {
 			panic(err)
 		}
 	}
 
-	// Listen for system signals to gracefully shut down
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	<-c
