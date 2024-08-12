@@ -9,8 +9,8 @@ export default function ModalMessageComponent() {
   const close = () => {
     setModal({
       isVisible: false,
-      messageUser: '',
-      messageBot: '',
+      messageUser: [],
+      messageBot: [],
       userName: '',
     });
   };
@@ -27,8 +27,8 @@ export default function ModalMessageComponent() {
         <View style={styles.content}>
           <Text style={styles.contentTitle}>{store.userName}</Text>
           <View style={{ marginTop: 30, width: '100%' }}>
-            <ChatBubbleComponent isLeft={true} message={store.messageUser} />
-            <ChatBubbleComponent isLeft={false} message={store.messageBot} />
+            <ChatBubbleComponent isLeft={true} messages={store.messageUser} />
+            <ChatBubbleComponent isLeft={false} messages={store.messageBot} />
           </View>
         </View>
       </Modal>

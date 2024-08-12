@@ -4,6 +4,7 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useRecoilState } from 'recoil';
 import { messageDetailState } from '@/store/atom';
 import { useState } from 'react';
+
 type CardComponentProps = {
   isMessage: boolean;
   name?: string;
@@ -12,20 +13,22 @@ type CardComponentProps = {
   usageTimingHour?: string;
   messageDetail?: string;
   image?: any;
+  messages: string[];
 };
 
 export default function CardComponent(props: CardComponentProps) {
   const [isModalVisible, setIsModalVisible] =
     useRecoilState(messageDetailState);
 
-  const [userDetail, setUserDetail ] = useState(false);
+  const [userDetail, setUserDetail] = useState(false);
 
   const showModal = () => {
     setIsModalVisible({
       isVisible: true,
-      messageUser: 'Hello Luis, how are you?',
-      messageBot:
+      messageUser: props.messages || '',
+      messageBot: [
         'Hey Matteo, happy to hear from you! I am currently working and cant really talk right now. This is an automated message. I will get back to you as soon as possible.',
+      ],
       userName: props.name || '',
     });
   };

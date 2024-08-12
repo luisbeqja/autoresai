@@ -3,46 +3,49 @@ import { Button, StyleSheet, Text, View } from 'react-native';
 
 type ChatBubbleComponentProps = {
   isLeft: boolean;
-  message: string;
+  messages: string[];
 };
 
 export default function ChatBubbleComponent(props: ChatBubbleComponentProps) {
   return (
     <>
-      {props.isLeft ? (
-        <View style={[styles.container, styles.leftContainer]}>
-          <Text style={styles.textLeft}>{props.message}</Text>
+      {props.messages.map((message, index) => (
+        <View
+          key={index}
+          style={[
+            styles.container,
+            props.isLeft ? styles.leftContainer : styles.rightContainer,
+          ]}
+        >
+          <Text
+            style={props.isLeft ? styles.textLeft : styles.text}
+          >
+            {message}
+          </Text>
           <Text
             style={{
               fontSize: 12,
-              color: '#000',
+              color: props.isLeft ? '#000' : 'white',
               paddingVertical: 5,
+              textAlign: props.isLeft ? 'left' : 'right',
               opacity: 0.6,
             }}
           >
             12.30
           </Text>
-          <View style={styles.leftArrow} />
-          <View style={styles.leftArrowOverlap} />
+          {props.isLeft ? (
+            <>
+              <View style={styles.leftArrow} />
+              <View style={styles.leftArrowOverlap} />
+            </>
+          ) : (
+            <>
+              <View style={styles.rightArrow} />
+              <View style={styles.rightArrowOverlap} />
+            </>
+          )}
         </View>
-      ) : (
-        <View style={[styles.container, styles.rightContainer]}>
-          <Text style={styles.text}>{props.message}</Text>
-          <Text
-            style={{
-              fontSize: 12,
-              color: 'white',
-              paddingVertical: 5,
-              textAlign: 'right',
-              opacity: 0.6,
-            }}
-          >
-            12.30
-          </Text>
-          <View style={styles.rightArrow} />
-          <View style={styles.rightArrowOverlap} />
-        </View>
-      )}
+      ))}
     </>
   );
 }
